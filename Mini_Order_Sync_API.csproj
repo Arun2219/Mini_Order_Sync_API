@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Mini_Order_Sync_API</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Dapper: High-performance Micro-ORM for raw SQL querying -->
+    <PackageReference Include="Dapper" Version="2.1.35" />
+
+    <!-- Microsoft.Data.SqlClient: Modern SQL Server client driver -->
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+
+    <!-- Swashbuckle: Swagger / OpenAPI documentation generator -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+</Project>

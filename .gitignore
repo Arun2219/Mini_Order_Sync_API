@@ -1,0 +1,26 @@
+## Visual Studio / VS Code
+.vscode/
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+
+## Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+## OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
