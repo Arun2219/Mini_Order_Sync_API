@@ -82,7 +82,10 @@ if (app.Environment.IsDevelopment() || true) // Enable Swagger in all environmen
 app.UseMiddleware<ApiKeyMiddleware>();
 
 app.UseHttpsRedirection();
-app.UseAuthorization();
 app.MapControllers();
 
+// 9. Initialize Database (Creates tables if SQLite)
+DbInitializer.Initialize(app.Services.GetRequiredService<ISqlConnectionFactory>());
+
 app.Run();
+

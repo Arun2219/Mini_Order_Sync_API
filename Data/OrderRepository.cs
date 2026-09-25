@@ -21,10 +21,13 @@ public class OrderRepository : IOrderRepository
             connection.Open();
         }
 
+        var isSqlite = connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+        var idQuery = isSqlite ? "SELECT last_insert_rowid();" : "SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
         using var transaction = connection.BeginTransaction();
         try
         {
-            const string insertOrderSql = @"
+            var insertOrderSql = $@"
                 INSERT INTO Orders (
                     OrderNumber, CustomerName, CustomerEmail, TotalAmount, 
                     Status, RetryCount, ErrorMessage, CreatedAtUtc, UpdatedAtUtc, SyncedAtUtc
@@ -33,7 +36,7 @@ public class OrderRepository : IOrderRepository
                     @OrderNumber, @CustomerName, @CustomerEmail, @TotalAmount, 
                     @Status, @RetryCount, @ErrorMessage, @CreatedAtUtc, @UpdatedAtUtc, @SyncedAtUtc
                 );
-                SELECT CAST(SCOPE_IDENTITY() AS INT);";
+                {idQuery}";
 
             var commandDefinition = new CommandDefinition(
                 insertOrderSql,
@@ -46,15 +49,15 @@ public class OrderRepository : IOrderRepository
                     order.Status,
                     order.RetryCount,
                     order.ErrorMessage,
-                    order.CreatedAtUtc,
-                    order.UpdatedAtUtc,
-                    order.SyncedAtUtc
+                    CreatedAtUtc = isSqlite ? order.CreatedAtUtc.ToString("o") : (object)order.CreatedAtUtc,
+                    UpdatedAtUtc = isSqlite ? order.UpdatedAtUtc.ToString("o") : (object)order.UpdatedAtUtc,
+                    SyncedAtUtc = order.SyncedAtUtc.HasValue ? (isSqlite ? order.SyncedAtUtc.Value.ToString("o") : (object)order.SyncedAtUtc.Value) : null
                 },
                 transaction: transaction,
                 cancellationToken: cancellationToken
             );
 
-            var orderId = await connection.ExecuteScalarAsync<int>(commandDefinition);
+            var orderId = Convert.ToInt32(await connection.ExecuteScalarAsync(commandDefinition));
             order.Id = orderId;
 
             if (order.OrderLines.Count > 0)
@@ -106,7 +109,8 @@ public class OrderRepository : IOrderRepository
             ) THEN 1 ELSE 0 END;";
 
         var command = new CommandDefinition(sql, new { OrderNumber = orderNumber }, cancellationToken: cancellationToken);
-        return await connection.ExecuteScalarAsync<bool>(command);
+        var result = await connection.ExecuteScalarAsync(command);
+        return Convert.ToInt32(result) == 1;
     }
 
     public async Task<Order?> GetByOrderNumberAsync(string orderNumber, CancellationToken cancellationToken = default)
@@ -202,26 +206,33 @@ public class OrderRepository : IOrderRepository
     {
         using var connection = _connectionFactory.CreateConnection();
         var offset = (page - 1) * pageSize;
+        var isSqlite = connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
 
         const string countSql = @"
             SELECT COUNT(1) 
             FROM Orders 
             WHERE (@Status IS NULL OR Status = @Status);";
 
-        const string itemsSql = @"
-            SELECT Id, OrderNumber, CustomerName, CustomerEmail, TotalAmount, 
-                   Status, RetryCount, ErrorMessage, CreatedAtUtc, UpdatedAtUtc, SyncedAtUtc
-            FROM Orders
-            WHERE (@Status IS NULL OR Status = @Status)
-            ORDER BY CreatedAtUtc DESC
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+        var itemsSql = isSqlite
+            ? @"SELECT Id, OrderNumber, CustomerName, CustomerEmail, TotalAmount, 
+                       Status, RetryCount, ErrorMessage, CreatedAtUtc, UpdatedAtUtc, SyncedAtUtc
+                FROM Orders
+                WHERE (@Status IS NULL OR Status = @Status)
+                ORDER BY CreatedAtUtc DESC
+                LIMIT @PageSize OFFSET @Offset;"
+            : @"SELECT Id, OrderNumber, CustomerName, CustomerEmail, TotalAmount, 
+                       Status, RetryCount, ErrorMessage, CreatedAtUtc, UpdatedAtUtc, SyncedAtUtc
+                FROM Orders
+                WHERE (@Status IS NULL OR Status = @Status)
+                ORDER BY CreatedAtUtc DESC
+                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
 
         var countCommand = new CommandDefinition(
             countSql, 
             new { Status = status }, 
             cancellationToken: cancellationToken
         );
-        var totalCount = await connection.ExecuteScalarAsync<int>(countCommand);
+        var totalCount = Convert.ToInt32(await connection.ExecuteScalarAsync(countCommand));
 
         var itemsCommand = new CommandDefinition(
             itemsSql, 
@@ -237,15 +248,26 @@ public class OrderRepository : IOrderRepository
         int maxRetries, int limit = 50, CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
-        const string sql = @"
-            SELECT TOP (@Limit)
-                o.Id, o.OrderNumber, o.CustomerName, o.CustomerEmail, o.TotalAmount, 
-                o.Status, o.RetryCount, o.ErrorMessage, o.CreatedAtUtc, o.UpdatedAtUtc, o.SyncedAtUtc,
-                l.Id, l.OrderId, l.Sku, l.ProductName, l.Quantity, l.UnitPrice, l.TotalPrice
-            FROM Orders o
-            LEFT JOIN OrderLines l ON o.Id = l.OrderId
-            WHERE o.Status = 'Pending' AND o.RetryCount < @MaxRetries
-            ORDER BY o.CreatedAtUtc ASC;";
+        var isSqlite = connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+
+        var sql = isSqlite
+            ? @"SELECT 
+                    o.Id, o.OrderNumber, o.CustomerName, o.CustomerEmail, o.TotalAmount, 
+                    o.Status, o.RetryCount, o.ErrorMessage, o.CreatedAtUtc, o.UpdatedAtUtc, o.SyncedAtUtc,
+                    l.Id, l.OrderId, l.Sku, l.ProductName, l.Quantity, l.UnitPrice, l.TotalPrice
+                FROM Orders o
+                LEFT JOIN OrderLines l ON o.Id = l.OrderId
+                WHERE o.Status = 'Pending' AND o.RetryCount < @MaxRetries
+                ORDER BY o.CreatedAtUtc ASC
+                LIMIT @Limit;"
+            : @"SELECT TOP (@Limit)
+                    o.Id, o.OrderNumber, o.CustomerName, o.CustomerEmail, o.TotalAmount, 
+                    o.Status, o.RetryCount, o.ErrorMessage, o.CreatedAtUtc, o.UpdatedAtUtc, o.SyncedAtUtc,
+                    l.Id, l.OrderId, l.Sku, l.ProductName, l.Quantity, l.UnitPrice, l.TotalPrice
+                FROM Orders o
+                LEFT JOIN OrderLines l ON o.Id = l.OrderId
+                WHERE o.Status = 'Pending' AND o.RetryCount < @MaxRetries
+                ORDER BY o.CreatedAtUtc ASC;";
 
         var orderDictionary = new Dictionary<int, Order>();
 
@@ -283,14 +305,24 @@ public class OrderRepository : IOrderRepository
         int id, string status, int retryCount, string? errorMessage, DateTime? syncedAtUtc, CancellationToken cancellationToken = default)
     {
         using var connection = _connectionFactory.CreateConnection();
-        const string sql = @"
-            UPDATE Orders
-            SET Status = @Status,
-                RetryCount = @RetryCount,
-                ErrorMessage = @ErrorMessage,
-                SyncedAtUtc = @SyncedAtUtc,
-                UpdatedAtUtc = SYSUTCDATETIME()
-            WHERE Id = @Id;";
+        var isSqlite = connection.GetType().Name.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+        var updatedAt = DateTime.UtcNow;
+
+        var sql = isSqlite
+            ? @"UPDATE Orders
+                SET Status = @Status,
+                    RetryCount = @RetryCount,
+                    ErrorMessage = @ErrorMessage,
+                    SyncedAtUtc = @SyncedAtUtc,
+                    UpdatedAtUtc = @UpdatedAtUtc
+                WHERE Id = @Id;"
+            : @"UPDATE Orders
+                SET Status = @Status,
+                    RetryCount = @RetryCount,
+                    ErrorMessage = @ErrorMessage,
+                    SyncedAtUtc = @SyncedAtUtc,
+                    UpdatedAtUtc = SYSUTCDATETIME()
+                WHERE Id = @Id;";
 
         var command = new CommandDefinition(
             sql,
@@ -300,7 +332,8 @@ public class OrderRepository : IOrderRepository
                 Status = status,
                 RetryCount = retryCount,
                 ErrorMessage = errorMessage,
-                SyncedAtUtc = syncedAtUtc
+                SyncedAtUtc = syncedAtUtc.HasValue ? (isSqlite ? syncedAtUtc.Value.ToString("o") : (object)syncedAtUtc.Value) : null,
+                UpdatedAtUtc = isSqlite ? updatedAt.ToString("o") : (object)updatedAt
             },
             cancellationToken: cancellationToken
         );
