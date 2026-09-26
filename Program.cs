@@ -84,7 +84,7 @@ app.UseMiddleware<ApiKeyMiddleware>();
 app.UseHttpsRedirection();
 app.MapControllers();
 
-// 9. Initialize Database (Creates tables if SQLite)
+// 9. Initialize Database (Ensures SQL Server tables exist)
 DbInitializer.Initialize(app.Services.GetRequiredService<ISqlConnectionFactory>());
 
 app.Run();

@@ -1,0 +1,129 @@
+{
+	"info": {
+		"_postman_id": "8f3b20e4-18c7-4321-9988-miniordersync01",
+		"name": "Mini Order Sync API",
+		"description": "Collection for testing Mini Order Sync API endpoints with X-Api-Key authentication.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Ingest Webhook Order (POST)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "X-Api-Key",
+						"value": "secret-mini-order-sync-api-key-2026",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"orderNumber\": \"ORD-POSTMAN-001\",\n  \"customerName\": \"Jane Doe\",\n  \"customerEmail\": \"jane.doe@example.com\",\n  \"totalAmount\": 228.99,\n  \"orderLines\": [\n    {\n      \"sku\": \"PROD-001\",\n      \"productName\": \"Wireless Mechanical Keyboard\",\n      \"quantity\": 1,\n      \"unitPrice\": 129.99\n    },\n    {\n      \"sku\": \"PROD-002\",\n      \"productName\": \"Ergonomic Mouse\",\n      \"quantity\": 2,\n      \"unitPrice\": 49.50\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "http://localhost:5000/webhooks/orders",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"webhooks",
+						"orders"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2. Get Order by OrderNumber (GET)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Api-Key",
+						"value": "secret-mini-order-sync-api-key-2026",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:5000/orders/ORD-POSTMAN-001",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"orders",
+						"ORD-POSTMAN-001"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3. List Orders (GET)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Api-Key",
+						"value": "secret-mini-order-sync-api-key-2026",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:5000/orders?status=Pending&page=1&pageSize=10",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"orders"
+					],
+					"query": [
+						{
+							"key": "status",
+							"value": "Pending"
+						},
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "pageSize",
+							"value": "10"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "4. Unauthorized Test - Missing Key (GET)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5000/orders",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"orders"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

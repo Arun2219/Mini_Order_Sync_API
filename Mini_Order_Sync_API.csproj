@@ -13,7 +13,6 @@
 
     <!-- Microsoft.Data.SqlClient: Modern SQL Server client driver -->
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
 
     <!-- Swashbuckle: Swagger / OpenAPI documentation generator -->
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
